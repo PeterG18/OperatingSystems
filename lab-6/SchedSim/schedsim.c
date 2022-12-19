@@ -4,32 +4,39 @@
 #include<stdlib.h>
 #include "process.h"
 #include "util.h"
-
+#include <stdbool.h>
 
 // Function to find the waiting time for all  
 // processes
 void findWaitingTimeRR(ProcessType plist[], int n,int quantum) 
 { 
 
-   int i,t;
-   int rem_bt[n];
-   for (i=0;i < n;i++){//make copy of burst times of processes
-     rem_bt[i] = plist[i].bt;
-   }
-  for (i=0;i<n;i++){//initialize them to 0
-    plist[i].wt = 0;
+  int bt_rem[n];
+  for (int i=0; i<n; i++){
+    bt_rem[i]=plist[i].bt;
   }
-  for (i=0;i<n;i++){//wait time is tat - bt
-    plist[i].wt = (plist[i].tat - plist[i].bt);
-  }
-  t=0;
-  for (i=0;i<n;i++){
-    if (rem_bt[i]>quantum){
-      t = t + quantum;
-      rem_bt[i] -= quantum;
+  int t=0;
+  int count=n;
+  int i=0;
+  while (count!=0){
+    if (i==n){
+      i=0;
+    }
+    if(bt_rem[i]==0){
+      i++;
+      continue;
+    }
+    else if (bt_rem[i]>quantum){
+      t=t+quantum;
+      bt_rem[i]-=quantum;
+      i++;
     }
     else{
-      t = t + rem_bt[i];
+      t+=bt_rem[i];
+      plist[i].wt = t - plist[i].bt;
+      bt_rem[i] = 0;
+      i++;
+      count-=1;
     }
   }
 } 
@@ -38,21 +45,37 @@ void findWaitingTimeRR(ProcessType plist[], int n,int quantum)
 // processes 
 void findWaitingTimeSJF(ProcessType plist[], int n)
 { 
-
-     int i, comp_counter, comp_time, lap_num;
-     comp_counter = 0;
-     comp_time = 0;
-     lap_num = 0;
-  
-     for (i=0;i<n;i++){
-       plist[i].wt = ((plist[i].wt) - 1);
-       if (plist[i].wt == 0){
-         comp_counter++;
-         lap_num++;
-         comp_time = comp_time+1;
-         plist[i].wt = ((comp_time) - (plist[i].art - plist[i].bt));    
-       }
-     }
+  int bt_rem[n];
+  for (int i=0; i<n; i++){
+    bt_rem[i]=plist[i].bt;
+  }
+  int t =0;
+  int count=n;
+  while (count>0){
+    int curr=0;
+    int low=100;
+    bool proceed=false;
+    for (int i=0;i<n;i++){
+      if (bt_rem[i]<low && bt_rem[i]!=0 && plist[i].art<=t){
+        low=bt_rem[i];
+        curr=i;
+        proceed=true;
+      }
+    }
+    if (proceed){
+      if(bt_rem[curr]==1){
+        plist[curr].wt=t-plist[curr].art-plist[curr].bt+1;
+        plist[curr].tat=t-plist[curr].art+1;
+        count-=1;
+      }
+    bt_rem[curr]-=1;
+    proceed=false;
+    t++;
+    }
+    else{
+      t++;
+    }
+  }
 } 
 
 // Function to find the waiting time for all  
@@ -78,20 +101,18 @@ void findTurnAroundTime( ProcessType plist[], int n)
 // Function to sort the Process acc. to priority
 int my_comparer(const void *this, const void *that)
 { 
-  
-    /*  
-     * 1. Cast this and that into (ProcessType *)
-     * 2. return 1 if this->pri < that->pri
-     */ 
-    ProcessType *this1 = (ProcessType*) &this;
-    ProcessType *that1 = (ProcessType*) &that;
-  
-    if (this1->pri < that1->pri){
-      return 1;
-    }
-//used to learn how to cast 
-//https://stackoverflow.com/questions/23168364/error-request-for-member-in-something-not-a-structure-or-union
-    return 0;
+     int int_this = * ( (int*) this );
+     int int_that = * ( (int*) that );
+
+     if ( int_this == int_that ){
+        return 0;
+     }
+     else if ( int_this > int_that ) {
+       return -1;
+     }
+     else{
+        return 1;
+     }
 } 
 
 //Function to calculate average time 
@@ -141,8 +162,36 @@ void findavgTimePriority( ProcessType plist[], int n)
     * 1- Sort the processes (i.e. plist[]), burst time and priority according to the priority.
     * 2- Now simply apply FCFS algorithm.
     */
-    qsort(plist, n, sizeof(ProcessType),my_comparer);
-    findavgTimeFCFS(plist, n);
+    int prio[n];
+    for (int i=0; i<n; i++){
+      prio[i]=plist[i].pri;
+    }
+    qsort(prio,n,sizeof(int),my_comparer);
+
+    int pids[n];
+    ProcessType plist2[n];
+    bool move =true;
+    for (int i=0; i<n; i++){
+      move=true;
+      for(int el=0;el<n;el++){
+        if (prio[i]==plist[el].pri && move==true && pids[plist[el].pid-1]!=1){
+          move=false;
+          plist2[i]=plist[el];
+          pids[plist[el].pid-1]=1;
+        }
+      }
+    }
+
+    for(int i=0; i<n; i++){
+      plist[i]=plist2[i];
+    }
+
+    //Function to find waiting time of all processes 
+    findWaitingTime(plist, n); 
+  
+    //Function to find turn around time for all processes 
+    findTurnAroundTime(plist, n);     
+  
     //Display processes along with all details 
     printf("\n*********\nPriority\n");
 }
