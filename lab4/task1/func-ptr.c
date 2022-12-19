@@ -24,13 +24,22 @@ typedef int (*Comparer) (const void *a, const void *b);
  */
 int my_comparer(const void *this, const void *that)
 {
-	//TODO: IMPLEMENT ME!
-  if (&this < &that)
-    return -1;
-  if (&this == &that)
-    return 0;
-  if (&this > &that)
+	Process *P1=(Process*) this;
+  Process *P2=(Process*) that;
+  if (P1->priority < P2->priority){
     return 1;
+  }
+  else if (P1 ->priority>P2->priority){
+    return -1;
+  }
+  else{
+    if(P1->arrival_time<P2->arrival_time){
+      return -1;
+    }
+    else if (P1->arrival_time>P2->arrival_time){
+      return 1;
+    }
+  }
 	return 0;
 }
 
@@ -90,3 +99,5 @@ int main(int argc, char *argv[])
 	fclose(input_file);
 	return 0;
 }
+
+//worked on w ben
