@@ -7,99 +7,114 @@
 #include <sys/wait.h>
 
 
-//helped
-int randForSleep(){
-  srand((time(NULL)));
-  int randNum = ((rand()%5)+1);//up to 10 seconds
-  return randNum;
-}
+void ChildProcess(int []);
+void ParentProcess(int []);
 
-int randForMoney_P(){//parent
-  srand((time(NULL)*390));
-  int randNum = ((rand()%100)+1);//generate random number between 0-100
-  return randNum;
-}
+int  main(int  argc, char *argv[])
+{
+     int    ShmID;
+     int    *ShmPTR;
+     pid_t  pid;
+     int    status;
 
-int randForMoney_C(){//child
-  srand((time(NULL)*390));
-  int randNum = ((rand()%50)+1);//generate random number between 0-50
-  return randNum;
-}
+     ShmID = shmget(IPC_PRIVATE, 4*sizeof(int), IPC_CREAT | 0666);
+     if (ShmID < 0) {
+          printf("*** shmget error (server) ***\n");
+          exit(1);
+     }
+     printf("Server has received a shared memory of two integers...\n");
 
-int main(){
-  int BankAccount = 0;
-  int Turn = 0;
-  int balance;
-  int ShmID;
-  int *ShmPTR;
-  
-  ShmID = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0666);
-  ShmPTR = (int *) shmat(ShmID, NULL, 0);
+     ShmPTR = (int *) shmat(ShmID, NULL, 0);
      if (*ShmPTR == -1) {
           printf("*** shmat error (server) ***\n");
           exit(1);
      }
-  ShmPTR[0] = BankAccount;
-  ShmPTR[1] = Turn;
+     printf("Process has attached the shared memory...\n");
 
-  pid_t pid;
-  pid = fork();
-  
-  if (pid < 0)
-    printf("Fork error. \n");
-  
-  //Parent process
-  else if (pid > 0){
-    int i = 1;
-    for (i = 1; i <= 25; i++){
-      sleep(randForSleep());
-      while (ShmPTR[1] != 0);
-      if (BankAccount <= 100){
-        //Deposit Money
-        balance = randForMoney_P();
-        if (balance % 2 == 0){//if number is even
-          //Deposit Money in Bank Account
-          ShmPTR[0] += balance;
-          //ShmPTR[0] += balance;
-          printf("Dear old Dad: Deposits $%d / Balance = $%d\n", balance, ShmPTR[0]);
-          //ShmPTR[1] = 1;
-          //printf("Turn value is %d\n", ShmPTR[1]);
+     ShmPTR[0] = 0;
+     ShmPTR[1] = 0;
+     int BannkAccount = ShmPTR[0];
+
+     printf("Orig Bank Account = %d\n",
+            BannkAccount);
+
+     pid = fork();
+     if (pid < 0) {
+          printf("*** fork error (server) ***\n");
+          exit(1);
+     }
+     else if (pid == 0) {
+          ChildProcess(ShmPTR);
+          exit(0);
+     }
+
+     else{
+       ParentProcess(ShmPTR);
+     }
+
+     wait(&status);
+     shmdt((void *) ShmPTR);
+     shmctl(ShmID, IPC_RMID, NULL);
+     exit(0);
+}
+
+void  ParentProcess(int  SharedMem[])
+{
+  //int BannkAccount = SharedMem[0];
+  //int Turn = SharedMem[1];
+  int account;
+  int balance;
+  srand(getpid());
+  for (int i=0; i<25; i++){
+    int x = rand()%6;
+    sleep(x);
+    account=SharedMem[0];
+    while (SharedMem[1] !=0);
+      if (account<=100){
+        int add = rand()%101;
+        balance=add;
+        if (balance%2==0){
+          account+=balance;
+          printf("Dear old Dad: Deposits $%d / Balance = $%d\n", balance, account);
         }
-        if (balance % 2 != 0){//if number is odd
-          printf("Dear old Dad: Doesn't have any money to give\n");
-          //ShmPTR[1] = 1;
-         // printf("Turn value is %d\n", ShmPTR[1] );
+        else if (balance%2==1){
+          printf("Dear old Dad: Doesn't have any money to give \n");
         }
-        //wait(NULL);//comment next run
-        ShmPTR[1] = 1;
+      SharedMem[0]=account;
       }
       else {
-        printf("Dear old Dad: Thinks Student has enough Cash ($%d)\n", ShmPTR[0]);
-      }
+        printf("Dear old Dad: Thinks Student has enough Cash ($%d)\n", account);
+      }    
+      SharedMem[1]=1;
+  }
+}
 
-     }
-    exit(0);
-  }
-  //Child process
-  else {
-    int i = 1;
-    for (i = 1; i <= 25; i++){
-      sleep(randForSleep());
-      while (ShmPTR[1] != 1);
-      balance = randForMoney_C();
+
+void  ChildProcess(int  SharedMem[])
+{
+  //int BannkAccount = SharedMem[0];
+  //int Turn = SharedMem[1];
+  int account;
+  int balance;
+  srand(getpid());
+  for (int i=0; i<25; i++){
+    int x = rand()%6;
+    sleep(x);
+    while (SharedMem[1] !=1);
+      account=SharedMem[0];
+      int add = rand()%51;
+      balance=add;
       printf("Poor Student needs $%d\n", balance);
-      if (balance <= ShmPTR[0]){
-        //balance <= BankAccount
-        //Withdraw money from bank account
-        ShmPTR[0] -= balance;
-        printf("Poor Student:Withdraws $%d / Balance = $%d\n", balance, ShmPTR[0]);
-       }
-      if (balance > ShmPTR[0]){
-        printf("Poor Student: Not Enough Cash ($%d)\n", ShmPTR[0]);
-       }
-       ShmPTR[1] = 0;
-       }
-     exit(0);
+      if (balance<=account){
+        account=account-balance;
+        printf("Poor Student: Withdraws $%d / Balance = $%d\n", balance, account);
+      }
+      else {
+        printf("Poor Student: Not Enough Cash ($%d)\n", account );
+      }
+    SharedMem[0]=account;
+    SharedMem[1]=0;
   }
-    
-  }
+}
+
+//help from ujjwal 
